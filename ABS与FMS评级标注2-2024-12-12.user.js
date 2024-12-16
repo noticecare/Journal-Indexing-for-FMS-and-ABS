@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         ABS与FMS评级标注2
+// @name         ABS与FMS评级标注3.0.0
 // @namespace    http://tampermonkey.net/
 // @version      2024-12-12
 // @description  1.在 sc.panda985.com 文献搜索结果中标注 FMS和ABS评级。2.在cnki.net中插入FMS中文评级
@@ -3143,10 +3143,37 @@
     'strategy and leadership'
         ]
     };
+    const UTD_RATINGS={
+   '24':[ "accounting review",
+    "the accounting review",
+    "journal of accounting and economics",
+    "journal of accounting research",
+    "journal of finance",
+    "journal of financial economics",
+    "the review of financial studies",
+    "information systems research",
+    "informs journal on computing",
+    "mis quarterly",
+    "journal of consumer research",
+    "journal of marketing",
+    "journal of marketing research",
+    "marketing science",
+    "management science",
+    "operations research",
+    "journal of operations management",
+    "manufacturing & service operations management",
+    "production and operations management",
+    "academy of management journal",
+    "academy of management review",
+    "administrative science quarterly",
+    "organization science",
+    "journal of international business studies",
+    "strategic management journal"
+    ]}
 
     // 添加自定义样式
     GM_addStyle(`
-    .fms-rating-badge, .abs-rating-badge {
+    .fms-rating-badge, .abs-rating-badge, .utd-rating-badge {
         display: inline-block;
         margin-left: 10px;
         padding: 2px 6px;
@@ -3161,6 +3188,15 @@
     .fms-rating-B { background-color: #FF9800; color: white; }  /* 橙色 */
     .fms-rating-C { background-color: #4CAF50; color: white; }  /* 绿色 */
     .fms-rating-D { background-color: #9E9E9E; color: white; }  /* 灰色 */
+    /*UTD color*/
+    .utd-rating-24 {
+    background: linear-gradient(to right, #FFB3BA,   /* 淡粉红 */
+        #FFDFBA,   /* 淡橙色 */
+        #FFFFBA,   /* 淡黄色 */
+        #BAFFC9,   /* 淡绿色 */
+        #BAE1FF    /* 淡蓝色 */  ); /* 彩色渐变 */
+    color: red; /* golden文字 */
+}
 
     /* ABS 评级颜色 */
 .abs-rating-5 { background-color: #800080; color: white; }  /* 紫色 */
@@ -3171,40 +3207,77 @@
 `);
 
     // 主函数：标注 FMS 评级
-    function annotateFMSRatings() {
+    function extractJournalName(text) {
+    try {
+        // 更健壮的期刊名称提取
+        const parts = text.split('-');
+        if (parts.length < 2) return null;
+
+        const journalPart = parts[1].trim();
+        const cleanName = journalPart.split(',')[0]
+            .replace(/&nbsp;/g, '')
+            .replace(/[^\w\s]/g, '')
+            .toLowerCase()
+            .trim();
+
+        return cleanName || null;
+    } catch (error) {
+        console.error('Error extracting journal name:', error);
+        return null;
+    }
+}
+
+
+   function annotateFMSRatings() {
+    try {
         // 选择所有搜索结果项
         const searchResults = document.querySelectorAll('.gs_a');
 
-        searchResults.forEach(result => {
-            // 检查是否已经添加过评级
-            if (result.querySelector('.fms-rating-badge')) return;
+        // 使用 for...of 替代 forEach，可以更好地控制流程
+        for (const result of searchResults) {
+            // 跳过已经添加过评级的结果
+            if (result.querySelector('.rating-badges')) continue;
 
-            // 提取期刊名
-            const journalName = result.textContent.split('-')[1]?.trim().split(',')[0].replace(/&nbsp;/g, '').toLowerCase(); // 从文本中提取期刊名称
+            // 安全地提取期刊名称
+            const journalName = extractJournalName(result.textContent);
 
-            // 查找期刊等级
+            // 如果无法提取期刊名，跳过当前结果
+            if (!journalName) continue;
+
+            // 查找期刊等级（保持原有逻辑）
             let fmsRating = null;
             let absRating = null;
+            let utdRating = null;
 
-            // 检查 FMS 评级
-            Object.entries(FMS_RATINGS).forEach(([rating, journals]) => {
+            // 使用 .some() 替代 .forEach()，提前终止遍历
+            Object.entries(FMS_RATINGS).some(([rating, journals]) => {
                 if (journals.includes(journalName)) {
                     fmsRating = rating;
+                    return true; // 找到后立即停止遍历
                 }
+                return false;
             });
 
-            // 检查 ABS 评级
-            Object.entries(ABS_RATINGS).forEach(([rating, journals]) => {
+            Object.entries(ABS_RATINGS).some(([rating, journals]) => {
                 if (journals.includes(journalName)) {
                     absRating = rating;
+                    return true;
                 }
+                return false;
+            });
+            Object.entries(UTD_RATINGS).some(([rating, journals]) => {
+                if (journals.includes(journalName)) {
+                    utdRating = rating;
+                    return true;
+                }
+                return false;
             });
 
-            // 创建评级容器
+            // 创建评级容器的逻辑保持不变
             const ratingContainer = document.createElement('div');
             ratingContainer.classList.add('rating-badges');
 
-            // 添加 FMS 徽章
+            // 添加徽章的逻辑保持不变
             if (fmsRating) {
                 const fmsBadge = document.createElement('span');
                 fmsBadge.classList.add('rating-badge', 'fms-rating-badge', `fms-rating-${fmsRating}`);
@@ -3212,36 +3285,56 @@
                 ratingContainer.appendChild(fmsBadge);
             }
 
-            // 添加 ABS 徽章
             if (absRating) {
                 const absBadge = document.createElement('span');
                 absBadge.classList.add('rating-badge', 'abs-rating-badge', `abs-rating-${absRating}`);
                 absBadge.textContent = `ABS: ${absRating}`;
                 ratingContainer.appendChild(absBadge);
             }
+            if (utdRating) {
+                const utdBadge = document.createElement('span');
+                utdBadge.classList.add('rating-badge', 'utd-rating-badge', `utd-rating-${utdRating}`);
+                utdBadge.textContent = `UTD: ${utdRating}`;
+                ratingContainer.appendChild(utdBadge);
+            }
 
             // 如果有评级，则添加到结果中
-            if (fmsRating || absRating) {
+            if (fmsRating || absRating || utdRating) {
                 result.appendChild(ratingContainer);
             }
-        });
+        }
+    } catch (error) {
+        console.error('Error in annotateFMSRatings:', error);
     }
+}
 
-    // 初始化：监听页面变化并标注评级
-    function init() {
+function init() {
+    try {
         // 立即标注当前结果
         annotateFMSRatings();
 
-        // 使用 MutationObserver 监听动态加载的搜索结果
-        const observer = new MutationObserver(function(mutations) {
-            annotateFMSRatings();
-        });
+        // 使用防抖的 MutationObserver
+        const observer = new MutationObserver(debounce(annotateFMSRatings, 300));
 
         observer.observe(document.body, {
             childList: true,
             subtree: true
         });
+    } catch (error) {
+        console.error('Error in init:', error);
     }
+}
 
-    init(); // 调用初始化函数
+// 简单的防抖函数
+function debounce(func, delay) {
+    let timeoutId;
+    return function() {
+        const context = this;
+        const args = arguments;
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => func.apply(context, args), delay);
+    };
+}
+
+init();
 })();
