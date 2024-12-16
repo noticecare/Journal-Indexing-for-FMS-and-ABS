@@ -5,7 +5,7 @@
 // @description  1.在 sc.panda985.com 文献搜索结果中标注 FMS和ABS评级。2.在cnki.net中插入FMS中文评级
 // @author       河北工业大学Haiyu Yan
 // @match        https://sc.panda985.com/*
-// @match        https://kns.cnki.net/*
+// @match        https://scholar.google.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=panda985.com
 // @grant        GM_addStyle
 // ==/UserScript==
